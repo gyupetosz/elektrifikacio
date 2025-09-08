@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>GENEX Asszisztens</title>
+
+ <style>
+  :root{
+    --navy:#2f3a67; --navy-d:#1e2750; --gold:#d9a441; --bg:#f3f6fa;
+    --panel:#ffffff; --bot-bg:#fff7e6; --bot-b:#e8c97a; --text:#2f2f2f;
+    --muted:#8a8f98; --code:#0f172a; --code-bg:#f1f5f9; --ring:rgba(47,58,103,.15);
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,"Helvetica Neue",Arial;
+    background:var(--bg); display:flex;align-items:center;justify-content:center; padding:20px; color:var(--text);
+  }
+
+  .app{ width:100%;max-width:720px;height:80vh; background:var(--panel); border-radius:16px;
+    box-shadow:0 12px 40px rgba(16,24,40,.12); display:flex;flex-direction:column;overflow:hidden; border:1px solid #e9eef5;}
+  .app__hd{ background:linear-gradient(135deg,var(--navy),var(--navy-d)); color:var(--gold);
+    padding:14px 16px; display:flex;align-items:center;gap:10px;}
+  .app__hd .badge{ width:28px;height:28px;border-radius:999px; display:grid;place-items:center;background:rgba(255,255,255,.1); color:#fff;font-size:14px;}
+  .app__title{font-weight:700;letter-spacing:.3px}
+  .app__sub{margin-left:auto;color:#d7c27f;font-size:12px;opacity:.9}
+
+  .msgs{flex:1;overflow:auto;padding:18px;background:#fafcff}
+
+  /* ====== Sor/Oszlop elrendezés – tiszta, ütközésmentes ====== */
+  .row{
+    --row-gap: 8px;                   /* avatar és oszlop közötti rés */
+    display:flex; gap:var(--row-gap);
+    margin:10px 0; align-items:flex-end; max-width:100%;
+  }
+  .row .col{
+    display:flex; flex-direction:column; gap:6px;
+    flex:0 0 auto;                   /* ne nőjön teljes szélességre */
+    width:fit-content;               /* col szélessége = tartalom (buborék) */
+    max-width:calc(100% - 32px - var(--row-gap)); /* 32px avatar */
+  }
+
+  /* User sor: jobbra tolva, avatarhoz simul */
+  .row.user{ justify-content:flex-end; --row-gap:0; }
+  .row.user .col{ align-items:flex-end; }
+
+  /* Bot sor: balra igazítva */
+  .row.bot .col{ align-items:flex-start; }
+
+  /* ====== Avatárok ====== */
+  .avatar{ width:32px;height:32px;border-radius:999px;flex:0 0 32px;
+    display:grid;place-items:center;font-size:14px; color:#fff;background:var(--navy);}
+  .avatar.bot{ background:#fff; border:1px solid #e4e7ef; }
+  .avatar.bot img{ width:80%; height:80%; object-fit:contain; padding:2px; }
+
+  /* ====== Buborékok ====== */
+  .bubble{
+    padding:12px 14px; border-radius:14px; line-height:1.5; font-size:15px;
+    box-shadow:0 2px 10px rgba(16,24,40,.06); border:1px solid transparent;
+    max-width:78%;
+    overflow-wrap:anywhere; word-break:break-word;
+  }
+  .bubble.user{
+    background:var(--navy); color:#fff; border-bottom-right-radius:6px;
+    max-width:75%;
+  }
+  .bubble.bot{
+    background:var(--bot-bg); border:1px solid var(--bot-b); border-bottom-left-radius:6px;
+    max-width:85%;
+  }
+
+  /* Typing/loader – stabil méret, nem csúszik */
+  .bubble.typing{
+    display:inline-flex; align-items:center; gap:8px; min-height:42px;
+    max-width:78%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .dots{display:inline-flex;gap:4px;vertical-align:middle}
+  .dots span{ width:6px;height:6px;border-radius:999px;background:#9c7a25;display:inline-block;
+    animation:blink 1.2s infinite ease-in-out;}
+  .dots span:nth-child(2){animation-delay:.15s}
+  .dots span:nth-child(3){animation-delay:.3s}
+  @keyframes blink{0%,80%,100%{opacity:.2}40%{opacity:1}}
+
+  /* ====== Időbélyeg (meta) – ott és úgy, ahogy kéred ====== */
+  .meta{ font-size:11px; color:var(--muted); margin-top:6px; width:auto; }
+  .row.user .meta{ align-self:flex-end; text-align:right; margin-right:6px; } /* jobbra, picit beljebb */
+  .row.bot  .meta{ align-self:flex-start; text-align:left;  margin-left:6px; } /* balon, picit beljebb */
+
+  /* ====== Dock & input ====== */
+  .dock{display:flex;gap:10px;padding:12px;border-top:1px solid #eef2f7;background:#f9fafc}
+  .field{ flex:1;background:#fff;border:1px solid #e9eef5;border-radius:12px;padding:12px 14px;
+    outline:0;box-shadow:0 0 0 2px transparent; transition:box-shadow .15s,border-color .15s; font-size:15px;}
+  .field:focus{border-color:#dbe4f3;box-shadow:0 0 0 4px var(--ring)}
+  .btn{ background:var(--navy);color:var(--gold);border:0;border-radius:12px; padding:0 18px;font-weight:700;cursor:pointer;min-width:92px;
+    transition:transform .05s ease, background .2s;}
+  .btn:hover{background:var(--navy-d)} .btn:active{transform:translateY(1px)}
+  .hint{font-size:12px;color:#97a0ab;text-align:center;padding:6px 0}
+
+  /* Ajánló gombok */
+  .suggestion-buttons{
+    display:grid; grid-template-columns:repeat(2,1fr); grid-auto-rows:1fr;
+    gap:10px; padding:10px 12px; border-top:1px solid #eef2f7; background:#f9fafc; overflow:hidden;
+  }
+  .suggestion-buttons button{
+    width:100%; background:#e0e7f5; color:var(--navy); border:1px solid #c3d4ed; border-radius:10px;
+    padding:10px 12px; cursor:pointer; font-size:15px; line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    transition:background .2s,border-color .2s,transform .02s ease-in-out;
+  }
+  .suggestion-buttons button:active{ transform:translateY(1px); }
+  .suggestion-buttons button:hover{ background:#d0daed; }
+
+  /* Nyelvválasztó */
+  .lang-selector { display:flex; gap:8px; margin-left:auto; }
+  .lang-selector button{
+      background: rgba(255,255,255,0.1);
+      color:#fff; border:1px solid rgba(255,255,255,0.2);
+      border-radius:8px; padding:4px 8px; cursor:pointer;
+      font-size:12px; font-weight:bold; transition:background .2s,border-color .2s;
+  }
+  .lang-selector button.active { background:var(--gold); color:var(--navy-d); border-color:var(--gold); }
+  .lang-selector button:hover:not(.active):not([disabled]){ background:rgba(255,255,255,0.2); }
+  .lang-selector button[disabled]{ opacity:.5; cursor:not-allowed; }
+
+  @media (max-width:560px){
+    .app{height:90vh}
+    .bubble{max-width:86%}
+    .row .col{max-width:calc(100% - 40px)}
+    .suggestion-buttons{ gap:8px; padding:8px 10px; }
+    .suggestion-buttons button{ font-size:14px; padding:9px 10px; }
+  }
+</style>
+
+  <script src="https://unpkg.com/marked@12.0.2/marked.min.js"></script>
+  <script src="https://unpkg.com/dompurify@3.1.7/dist/purify.min.js"></script>
+</head>
+<body>
+  <div class="app">
+    <div class="app__hd">
+      <div class="badge">💬</div>
+      <div class="app__title">GENEX Asszisztens</div>
+      <div class="lang-selector">
+        <button id="lang-hu" data-lang="hu">HU</button>
+        <button id="lang-en" data-lang="en">EN</button>
+        <button id="lang-de" data-lang="de" disabled>DE</button>
+      </div>
+      <div id="langBadge" class="app__sub">RAG • HU</div>
+    </div>
+
+    <div id="messages" class="msgs"></div>
+
+    <div id="suggestionButtons" class="suggestion-buttons"></div>
+
+    <div class="dock">
+      <input id="input" class="field" placeholder="Írd ide az üzeneted..." />
+      <button id="send" class="btn">Küldés</button>
+    </div>
+
+    <div id="hint" class="hint">Tipp: kérdezz bátran a termékekről vagy a szabályzatról.</div>
+  </div>
+
+<script>
+  const msgsEl = document.getElementById("messages");
+  const inputEl = document.getElementById("input");
+  const sendBtn = document.getElementById("send");
+  const hintEl  = document.getElementById("hint");
+  const langBadge = document.getElementById("langBadge");
+  const suggestionButtonsEl = document.getElementById("suggestionButtons");
+
+  const SUPPORTED_LANGS = ["hu", "en", "de"];
+  const BOT_IMG = "/img/genex-bot.png";
+
+  const BASE_QUESTIONS = {
+    hu: [
+      "Melyik GENEX termék segíthet a fáradtság ellen?",
+      "Mik az összetevői?",
+      "Listázd az összes terméket.",
+      "Milyen jutalékokat kapok, ha értékesítem a termékeket?",
+      "Mennyi ideig kell szedni a probiotikumot?",
+      "Szedhetem a Detox Boostert, ha cukorbeteg vagyok?",
+      "Hogyan lehet GENEX partneri státuszt szerezni?",
+      "Hogyan építhetek fel sikeres GENEX csapatot?",
+      "Mi a fő összetevő gyógyhatása?",
+      "Melyik termék segíti a méregtelenítést?"
+    ],
+    en: [
+      "Which GENEX product helps with fatigue?",
+      "What are its ingredients?",
+      "List all products.",
+      "What commissions do I get if I sell the products?",
+      "How long should I take the probiotic?",
+      "Can I take Detox Booster if I have diabetes?",
+      "How can I obtain GENEX partner status?",
+      "How can I build a successful GENEX team?",
+      "What is the main ingredient’s health benefit?",
+      "Which product supports detoxification?"
+    ],
+    de: [
+      "Welches GENEX-Produkt hilft gegen Müdigkeit?",
+      "Welche Inhaltsstoffe hat es?",
+      "Liste alle Produkte auf.",
+      "Welche Provisionen erhalte ich, wenn ich die Produkte verkaufe?",
+      "Wie lange sollte ich das Probiotikum einnehmen?",
+      "Kann ich den Detox Booster nehmen, wenn ich Diabetes habe?",
+      "Wie kann ich den GENEX-Partnerstatus erhalten?",
+      "Wie kann ich ein erfolgreiches GENEX-Team aufbauen?",
+      "Welche gesundheitliche Wirkung hat der Hauptwirkstoff?",
+      "Welches Produkt unterstützt die Entgiftung?"
+    ]
+  };
+
+  const UI = {
+    en: { placeholder:"Type your message…", send:"Send", hint:"Tip: ask about products or policies.", thinking:"Thinking" },
+    hu: { placeholder:"Írd ide az üzeneted…", send:"Küldés", hint:"Tipp: kérdezz bátran a termékekről vagy a szabályzatról.", thinking:"Gondolkodom" },
+    de: { placeholder:"Schreibe deine Nachricht…", send:"Senden", hint:"Tipp: Frage zu Produkten oder Richtlinien.", thinking:"Denke nach" }
+  };
+
+  function pickRandomN(arr, n){
+    const copy = arr.slice();
+    for(let i = copy.length - 1; i > 0; i--){
+      const j = Math.floor(Math.random() * (i + 1));
+      [copy[i], copy[j]] = [copy[j], copy[i]];
+    }
+    return copy.slice(0, n);
+  }
+
+  const normalizeLang = (tag) => {
+    const t = String(tag || "").toLowerCase();
+    if (t.startsWith("en")) return "en";
+    if (t.startsWith("hu")) return "hu";
+    if (t.startsWith("de")) return "de";
+    return null;
+  };
+  let currentLocale = localStorage.getItem("currentLocale") || normalizeLang(navigator.language) || "hu";
+
+  function md(html){ const raw=marked.parse(html??""); return DOMPurify.sanitize(raw,{USE_PROFILES:{html:true}}); }
+  function escapeHtml(s=""){ return s.replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]) ); }
+  function now(){ return new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"}); }
+
+  function appendBubble({who,html,typing=false}){
+    const row=document.createElement("div");
+    row.className="row "+(who==="user"?"user":"bot");
+
+    const avatar=document.createElement("div");
+    avatar.className="avatar "+(who==="user"?"user":"bot");
+    if(who==="user") avatar.textContent="👤";
+    else avatar.innerHTML=`<img src="${BOT_IMG}" alt="GENEX Bot" />`;
+
+    const col=document.createElement("div"); col.className="col";
+
+    const bubble=document.createElement("div");
+    bubble.className="bubble "+(who==="user"?"user":"bot")+(typing?" typing":"");
+    bubble.innerHTML= typing ? html : (who==="user"?escapeHtml(html):md(html));
+
+    const meta=document.createElement("div");
+    meta.className="meta"; meta.textContent=now();
+
+    col.appendChild(bubble); col.appendChild(meta);
+
+    if(who==="user"){ row.appendChild(col); row.appendChild(avatar); }
+    else { row.appendChild(avatar); row.appendChild(col); }
+
+    msgsEl.appendChild(row);
+    msgsEl.scrollTop=msgsEl.scrollHeight;
+    return {row, bubble, meta};
+  }
+
+  // Loader beszúrás animált pontokkal
+  function appendLoader(){
+    const ui=UI[currentLocale]||UI.hu;
+    const loaderHTML = `${ui.thinking}<span class="dots"><span></span><span></span><span></span></span>`;
+    return appendBubble({who:"bot", html:loaderHTML, typing:true});
+  }
+
+  // Loader lecserélése végleges bot válaszra (buborék mérete marad stabil)
+  function finishLoader(loaderObj, finalHTML){
+    if(!loaderObj?.bubble) return;
+    loaderObj.bubble.classList.remove("typing");
+    loaderObj.bubble.innerHTML = md(finalHTML);
+    loaderObj.meta.textContent = now();
+    msgsEl.scrollTop = msgsEl.scrollHeight;
+  }
+
+  function applyUI(lang){
+    const L = UI[lang] || UI.hu;
+    document.getElementById("input").placeholder = L.placeholder;
+    document.getElementById("send").textContent = L.send;
+    hintEl.textContent = L.hint;
+    langBadge.textContent = `RAG • ${lang.toUpperCase()}`;
+
+    SUPPORTED_LANGS.forEach(l => document.getElementById(`lang-${l}`).classList.remove("active"));
+    document.getElementById(`lang-${lang}`).classList.add("active");
+
+    // 4 véletlen kérdés 2×2 rácsban
+    suggestionButtonsEl.innerHTML = "";
+    const pool = BASE_QUESTIONS[lang] || BASE_QUESTIONS["hu"];
+    const choices = pickRandomN(pool, 4);
+    choices.forEach(q=>{
+      const btn=document.createElement("button");
+      btn.textContent=q;
+      btn.addEventListener("click",()=>{ inputEl.value=q; sendMessage(); });
+      suggestionButtonsEl.appendChild(btn);
+    });
+
+    document.getElementById("lang-de").disabled = true;
+  }
+
+  let currentProductId = Number(localStorage.getItem("currentProductId") || "0") || null;
+  let history = JSON.parse(localStorage.getItem("history") || "[]");
+
+  applyUI(currentLocale);
+
+  function saveState() {
+    const trimmed=history.slice(-12);
+    history=trimmed;
+    localStorage.setItem("history",JSON.stringify(trimmed));
+    localStorage.setItem("currentProductId",currentProductId==null?"":String(currentProductId));
+    localStorage.setItem("currentLocale",currentLocale);
+  }
+
+  function handleKey(e){ if(e.key==="Enter") sendMessage(); }
+
+  async function sendMessage(){
+    const msg=inputEl.value.trim(); if(!msg) return;
+    appendBubble({who:"user",html:msg}); inputEl.value="";
+    const loader = appendLoader(); // stabil, animált “Gondolkodom…”
+
+    const payload={ message:msg, productId:currentProductId, history:history.slice(-12), locale:currentLocale, lockLocale:true };
+    try{
+      const res=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
+      const data=res.ok?await res.json():{reply:"Hiba történt a válasz feldolgozásánál."};
+
+      finishLoader(loader, data.reply || "Hiba történt a válasz feldolgozásánál.");
+
+      history.push({role:"user",content:msg});
+      history.push({role:"assistant",content:data.reply||""});
+
+      if(data.productContext&&"currentProductId" in data.productContext){ currentProductId=data.productContext.currentProductId; }
+      if(data.replyLang&&SUPPORTED_LANGS.includes(data.replyLang)){ currentLocale=data.replyLang; applyUI(currentLocale); }
+      saveState();
+    } catch (err) {
+      finishLoader(loader, `⚠️ **Hiba:** ${escapeHtml(err.message || "Ismeretlen hiba.")}`);
+    } finally {
+      msgsEl.scrollTop = msgsEl.scrollHeight;
+    }
+  }
+
+  // Nyelvváltók
+  document.getElementById("lang-hu").addEventListener("click", () => { currentLocale = "hu"; applyUI("hu"); saveState(); });
+  document.getElementById("lang-en").addEventListener("click", () => { currentLocale = "en"; applyUI("en"); saveState(); });
+  document.getElementById("lang-de").addEventListener("click", () => { /* disabled */ });
+
+  inputEl.addEventListener("keypress", handleKey);
+  sendBtn.addEventListener("click", sendMessage);
+
+  // optional globals
+  window.handleKey = handleKey;
+  window.sendMessage = sendMessage;
+</script>
+
+</body>
+</html>

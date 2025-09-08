@@ -23,10 +23,12 @@
     .brand{font-weight:800;letter-spacing:.2px}
     .badge{margin-left:auto;font-size:12px;opacity:.85;color:#f5e7b6}
     .chat{height:64vh;min-height:380px;background:#f8fafc;padding:18px;overflow-y:auto}
+
     /* chips */
     .chips{display:flex;flex-wrap:wrap;gap:10px;padding:10px 14px;background:#fff;border-top:1px solid #eef2f7}
     .chip{border:1px solid #e5e7eb;background:#f9fafb;color:#374151;border-radius:14px;padding:10px 12px;cursor:pointer}
     .chip:hover{background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.05)}
+
     /* composer */
     .composer{display:flex;gap:10px;padding:14px;background:#fff;border-top:1px solid #eef2f7}
     .input{flex:1;border:1px solid #e5e7eb;border-radius:14px;padding:12px 14px;outline:0}
@@ -34,6 +36,7 @@
     .send{background:var(--navy);color:var(--gold);border:0;border-radius:12px;padding:0 18px;font-weight:700;cursor:pointer}
     .send:disabled{opacity:.6;cursor:not-allowed}
     .tip{font-size:12px;color:var(--muted);text-align:center;padding:6px 0 14px}
+
     /* bubbles */
     .row{display:flex;margin:8px 0}
     .row.user{justify-content:flex-end}
@@ -41,24 +44,28 @@
     .user .bubble{background:var(--bubble-user);border-bottom-right-radius:6px}
     .bot  .bubble{background:var(--bubble-bot);border-bottom-left-radius:6px}
     .meta{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
+
     /* typing */
     .typing{display:inline-flex;align-items:center;gap:8px;color:var(--muted)}
     .dots{display:inline-flex;gap:4px}
     .dot{width:6px;height:6px;border-radius:50%;background:#9c7a25;opacity:.3;animation:blink 1.2s infinite ease-in-out}
     .dot:nth-child(2){animation-delay:.15s}
     .dot:nth-child(3){animation-delay:.3s}
-	.cite {
- 	 color: #94a3b8;
- 	 font-size: 0.8em;
-	}
+
+    /* citations */
+    .cite{color:#94a3b8;font-size:.8em}
+
     @keyframes blink{0%,80%,100%{opacity:.25}40%{opacity:1}}
     @media (max-width:640px){.shell{border-radius:0;margin:0}.chat{height:70vh}.bubble{max-width:86%}}
   </style>
+
+  <!-- KaTeX for math -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
   <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
-<script src="https://unpkg.com/marked@12.0.2/marked.min.js"></script>
-<script src="https://unpkg.com/dompurify@3.1.7/dist/purify.min.js"></script>
+  <!-- Markdown + sanitize -->
+  <script src="https://unpkg.com/marked@12.0.2/marked.min.js"></script>
+  <script src="https://unpkg.com/dompurify@3.1.7/dist/purify.min.js"></script>
 </head>
 <body>
   <div class="shell">
@@ -84,110 +91,141 @@
   const send  = document.getElementById('send');
   const chips = document.getElementById('chips');
 
-  const QUESTIONS = [
-    "Hogyan számolható a töltési idő?",
-    "Hogyan számítható ki a hatótáv?",
-    "Mi a különbség az AC és DC töltés között?",
-    "Mit jelent a 11 kW AC töltés?",
-    "Mik a legfontosabb tényezők, amelyek csökkentik a hatótávot?",
-    "Hogyan optimalizálható az otthoni töltés költsége?",
+  /* ===== TELJES kérdés-pool ===== */
+  const SUGGESTIONS = [
+    "Mit jelent a BEV rövidítés?",
+    "Mit jelent a PHEV rövidítés?",
+    "Mi a REx autó?",
     "Mi a különbség a kW és kWh között?",
+    "Miért fontos az akkumulátor energiasűrűsége?",
     "Mit jelent a WLTP hatótáv?",
+    "Hogyan hat a jármű súlya a fogyasztásra?",
+    "Miért kevesebb a mozgó alkatrész az EV-kben?",
+    "Mit jelent az akkumulátor ciklusélettartam?",
+    "Mennyi garanciát adnak általában az EV akkumulátorra?",
+    "Mi a különbség az AC és DC töltés között?",
+    "Mekkora teljesítményű egy otthoni wallbox?",
+    "Hogyan számolható a töltési idő?",
+    "Miért lassabb az AC töltés?",
+    "Miért gyors a DC töltés?",
+    "Mi a CHAdeMO csatlakozó?",
+    "Mi a CCS szabvány?",
+    "Mit jelent a 11 kW AC töltés?",
+    "Hogyan befolyásolja a hideg idő a töltést?",
+    "Hogyan optimalizálható az otthoni töltés költsége?",
+    "Hogyan számítható ki a hatótáv?",
+    "Hogyan befolyásolja a sebesség a hatótávot?",
+    "Mi az a rekuperáció?",
+    "Hogyan hat a klíma használata a hatótávra?",
+    "Hogyan hat a fűtés télen a hatótávra?",
+    "Miért hasznos az előfűtés/előhűtés?",
+    "Milyen domborzati viszonyok csökkentik a hatótávot?",
+    "Hogyan tervezhető hosszabb út villanyautóval?",
+    "Miért nő a fogyasztás autópályán?",
+    "Hogyan csökkenthető a fogyasztás városban?",
+    "Miért olcsóbb az elektromos autó üzemeltetése?",
+    "Mi a TCO?",
+    "Milyen költségelemek tartoznak a TCO-ba?",
+    "Miért magasabb az elektromos autók maradványértéke?",
+    "Mennyi idő alatt térülhet meg egy EV?",
+    "Hogyan spórolhat egy cég flottánál EV-kkel?",
+    "Milyen adókedvezmények érhetők el cégeknek?",
+    "Hogyan segítik a támogatások a vásárlást?",
+    "Hogyan változik az üzemanyagárakhoz képest az áram költsége?",
+    "Miért éri meg flottát elektrifikálni?",
+    "Mire kell figyelni használt EV vásárlásánál?",
+    "Hogyan ellenőrizhető az akkumulátor SoH?",
+    "Miért fontos a garancia megléte?",
+    "Mit jelent a CPO autó?",
+    "Mit jelent az OTA frissítés?",
+    "Milyen biztosítási különbségek lehetnek?",
+    "Hogyan hat a gumiválasztás a fogyasztásra?",
+    "Miért fontos az aerodinamika?",
+    "Hogyan érdemes parkolni télen EV-vel?",
+    "Hogyan kell tárolni hosszabb használaton kívül?",
+    "Miért fontos a flotta TCO elemzése?",
+    "Hogyan tervezi meg egy cég a töltést?",
+    "Miért előnyös ESG szempontból a flottaelektrifikáció?",
+    "Hogyan számolható ki a CO₂-megtakarítás?",
+    "Miért fontos a telematikai adatok használata?",
+    "Hogyan kommunikálható a flotta elektrifikáció az ügyfelek felé?",
+    "Hogyan ütemezhető a fokozatos átállás?",
+    "Miért fontos a vezetők képzése EV-re?",
+    "Hogyan alakítható ki céges töltőhálózat?",
+    "Miért fontos a jövőbeli trendek követése?"
   ];
 
-  // --- helpers
+  /* ===== helpers ===== */
   const now = () => new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
   const esc = s => String(s).replace(/[&<>\"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
-  // Hivatkozások [1] → felső indexben
-  function prettifyCitations(s = '') {
-    return s.replace(/\[(\d+)\]/g, '<sup class="cite">[$1]</sup>');
+  function prettifyCitations(s=''){ return s.replace(/\[(\d+)\]/g, '<sup class="cite">[$1]</sup>'); }
+
+  function renderAnswer(container, rawText) {
+    const mdHtml  = marked.parse(String(rawText ?? ''));
+    const safe    = DOMPurify.sanitize(mdHtml, { USE_PROFILES:{ html:true }});
+    const pretty  = prettifyCitations(safe);
+    container.innerHTML = `<span class="meta">Asszisztens • ${now()}</span>${pretty}`;
+    if (window.renderMathInElement) {
+      renderMathInElement(container, {
+        delimiters: [
+          { left:"$$", right:"$$", display:true },
+          { left:"$",  right:"$",  display:false }
+        ]
+      });
+    }
+    chat.scrollTop = chat.scrollHeight;
   }
 
-  // KaTeX + citation render egy helyen
-function renderAnswer(container, rawText) {
-  // 1) Markdown -> HTML
-  const mdHtml = marked.parse(String(rawText ?? ''));
-
-  // 2) Biztonságosítás
-  const safeHtml = DOMPurify.sanitize(mdHtml, { USE_PROFILES: { html: true } });
-
-  // 3) [1] -> felső index
-  const pretty = prettifyCitations(safeHtml);
-
-  // 4) Beírás + KaTeX render
-  container.innerHTML = `<span class="meta">Asszisztens • ${now()}</span>${pretty}`;
-  if (window.renderMathInElement) {
-    renderMathInElement(container, {
-      delimiters: [
-        { left: "$$", right: "$$", display: true },
-        { left: "$",  right: "$",  display: false }
-      ]
-    });
-  }
-  chat.scrollTop = chat.scrollHeight;
-}
-
-  function addBubble(role, html) {
+  function addBubble(role, html){
     const row = document.createElement('div'); row.className = 'row ' + role;
     const bubble = document.createElement('div'); bubble.className = 'bubble';
     bubble.innerHTML = html;
     row.appendChild(bubble); chat.appendChild(row); chat.scrollTop = chat.scrollHeight;
     return bubble;
   }
-
-  function addUser(text) {
-    // a felhasználói üzenetet továbbra is escape-eljük
-    addBubble('user', `<span class="meta">Te • ${now()}</span>${esc(text)}`);
-  }
-
-  function addTyping() {
+  function addUser(text){ addBubble('user', `<span class="meta">Te • ${now()}</span>${esc(text)}`); }
+  function addTyping(){
     return addBubble('bot', `
       <span class="meta">Asszisztens • ${now()}</span>
       <span class="typing">Gondolkodom… <span class="dots"><span class="dot"></span><span class="dot"></span><span class="dot"></span></span></span>
     `);
   }
 
-  function renderChips() {
+  /* ===== rotating suggestion chips ===== */
+  let suggestionOffset = 0;
+  function renderSuggestions(){
     chips.innerHTML = '';
-    QUESTIONS.slice(0,4).forEach(q => {
+    const slice = SUGGESTIONS.slice(suggestionOffset, suggestionOffset + 4);
+    slice.forEach(q => {
       const btn = document.createElement('button');
       btn.className = 'chip'; btn.textContent = q; btn.title = q;
       btn.onclick = () => { input.value = q; doSend(); };
       chips.appendChild(btn);
     });
+    suggestionOffset = (suggestionOffset + 4) % SUGGESTIONS.length;
   }
 
-  async function doSend() {
-    const text = input.value.trim();
-    if (!text) return;
+  /* ===== chat send ===== */
+  async function doSend(){
+    const text = input.value.trim(); if(!text) return;
+    addUser(text); input.value=''; input.focus();
 
-    addUser(text);
-    input.value = '';
-    input.focus();
-
-    const typing = addTyping();
-    send.disabled = true;
+    const typing = addTyping(); send.disabled = true;
 
     try {
       const res = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type':'application/json' },
+        method:'POST',
+        headers:{ 'Content-Type':'application/json' },
         body: JSON.stringify({ messages:[{ role:'user', content:text }] })
       });
 
       const ctype = (res.headers.get('content-type') || '').toLowerCase();
 
-      // 1) JSON válasz esetén: NINCS ESCAPE -> KaTeX + citations
       if (ctype.includes('application/json')) {
         const data = await res.json();
-        const reply = data?.reply ?? data?.answer ?? 'Nincs válasz.';
-        renderAnswer(typing, reply);
-        return;
-      }
-
-      // 2) Stream esetén: közben plain text, a végén KaTeX render
-      if (res.body && res.body.getReader) {
+        renderAnswer(typing, data?.reply ?? data?.answer ?? 'Nincs válasz.');
+      } else if (res.body && res.body.getReader) {
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
         let done = false, acc = '';
@@ -196,45 +234,42 @@ function renderAnswer(container, rawText) {
           const { value, done: d } = await reader.read();
           done = d;
           acc += decoder.decode(value || new Uint8Array(), { stream:true });
-          // közben egyszerűen kiírjuk (escape-elve, hogy ne villogjon a KaTeX)
           typing.innerHTML = `<span class="meta">Asszisztens • ${now()}</span>${esc(acc)}`;
           chat.scrollTop = chat.scrollHeight;
         }
-
-        // végén szépen rendereljük
-        // ha a szerver JSON-t streamelt, próbáljuk parse-olni
         try {
           const maybe = JSON.parse(acc);
-          const reply = maybe?.reply ?? maybe?.answer ?? acc;
-          renderAnswer(typing, reply);
+          renderAnswer(typing, maybe?.reply ?? maybe?.answer ?? acc);
         } catch {
           renderAnswer(typing, acc);
         }
-        return;
+      } else {
+        const t = await res.text();
+        if (t.trim().startsWith('{')) {
+          try {
+            const j = JSON.parse(t);
+            renderAnswer(typing, j?.reply ?? j?.answer ?? t);
+          } catch {
+            renderAnswer(typing, t || 'Nincs válasz.');
+          }
+        } else {
+          renderAnswer(typing, t || 'Nincs válasz.');
+        }
       }
-
-      // 3) Fallback: text
-      const textBody = await res.text();
-      if (textBody.trim().startsWith('{')) {
-        try {
-          const data = JSON.parse(textBody);
-          const reply = data?.reply ?? data?.answer ?? textBody;
-          renderAnswer(typing, reply);
-          return;
-        } catch {}
-      }
-      renderAnswer(typing, textBody || 'Nincs válasz.');
     } catch (err) {
       typing.innerHTML = `<span class="meta">Asszisztens • ${now()}</span>⚠️ Hiba: ${esc(err?.message || String(err))}`;
     } finally {
       send.disabled = false;
+      // minden üzenet után léptessük a kérdés-chipeket
+      renderSuggestions();
     }
   }
 
   send.addEventListener('click', doSend);
   input.addEventListener('keydown', e => { if (e.key === 'Enter') doSend(); });
 
-  renderChips();
+  // induláskor kérdések kirakása
+  renderSuggestions();
 </script>
 </body>
 </html>

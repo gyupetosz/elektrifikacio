@@ -76,144 +76,154 @@
     <div class="tip">Tipp: kérdezz a hatótávról, töltésről vagy a szabályzatról.</div>
   </div>
 
-  <script>
-    const chat  = document.getElementById('chat');
-    const input = document.getElementById('input');
-    const send  = document.getElementById('send');
-    const chips = document.getElementById('chips');
+<script>
+  const chat  = document.getElementById('chat');
+  const input = document.getElementById('input');
+  const send  = document.getElementById('send');
+  const chips = document.getElementById('chips');
 
-    // Rövid, de lényeges kezdő kérdés-pool (bármikor bővíthető)
-    const QUESTIONS = [
-      "Hogyan számolható a töltési idő?",
-      "Hogyan számítható ki a hatótáv?",
-      "Mi a különbség az AC és DC töltés között?",
-      "Mit jelent a 11 kW AC töltés?",
-      "Mik a legfontosabb tényezők, amelyek csökkentik a hatótávot?",
-      "Hogyan optimalizálható az otthoni töltés költsége?",
-      "Mi a különbség a kW és kWh között?",
-      "Mit jelent a WLTP hatótáv?",
-    ];
+  const QUESTIONS = [
+    "Hogyan számolható a töltési idő?",
+    "Hogyan számítható ki a hatótáv?",
+    "Mi a különbség az AC és DC töltés között?",
+    "Mit jelent a 11 kW AC töltés?",
+    "Mik a legfontosabb tényezők, amelyek csökkentik a hatótávot?",
+    "Hogyan optimalizálható az otthoni töltés költsége?",
+    "Mi a különbség a kW és kWh között?",
+    "Mit jelent a WLTP hatótáv?",
+  ];
 
-    // Helper-ek
-    const now = () => new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
-    const esc = s => String(s).replace(/[&<>\"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  // --- helpers
+  const now = () => new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+  const esc = s => String(s).replace(/[&<>\"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
-    function addBubble(role, html) {
-      const row = document.createElement('div'); row.className = 'row ' + role;
-      const bubble = document.createElement('div'); bubble.className = 'bubble';
-      bubble.innerHTML = html;
-      row.appendChild(bubble); chat.appendChild(row); chat.scrollTop = chat.scrollHeight;
-      return bubble;
-    }
+  // Hivatkozások [1] → felső indexben
+  function prettifyCitations(s = '') {
+    return s.replace(/\[(\d+)\]/g, '<sup class="cite">[$1]</sup>');
+  }
 
-    function addUser(text) {
-      addBubble('user', `<span class="meta">Te • ${now()}</span>${esc(text)}`);
-    }
-
-    function addTyping() {
-      const b = addBubble('bot', `
-        <span class="meta">Asszisztens • ${now()}</span>
-        <span class="typing">Gondolkodom… <span class="dots"><span class="dot"></span><span class="dot"></span><span class="dot"></span></span></span>
-      `);
-      return b;
-    }
-
-    function setBotContent(bubble, html) {
-      bubble.innerHTML = `<span class="meta">Asszisztens • ${now()}</span>${html}`;
-      chat.scrollTop = chat.scrollHeight;
-    }
-
-    function renderChips() {
-      chips.innerHTML = '';
-      QUESTIONS.slice(0,4).forEach(q => {
-        const btn = document.createElement('button');
-        btn.className = 'chip'; btn.textContent = q; btn.title = q;
-        btn.onclick = () => { input.value = q; doSend(); };
-        chips.appendChild(btn);
+  // KaTeX + citation render egy helyen
+  function renderAnswer(container, rawText) {
+    const html = prettifyCitations(String(rawText ?? ''));
+    container.innerHTML = `<span class="meta">Asszisztens • ${now()}</span>${html}`;
+    if (window.renderMathInElement) {
+      renderMathInElement(container, {
+        delimiters: [
+          { left: "$$", right: "$$", display: true },
+          { left: "$",  right: "$",  display: false }
+        ]
       });
     }
-
-async function doSend() {
-  const text = input.value.trim(); 
-  if (!text) return;
-
-  addUser(text);
-  input.value = '';
-  input.focus();
-
-  const typing = addTyping();
-  send.disabled = true;
-
-  try {
-    const res = await fetch('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type':'application/json' },
-      body: JSON.stringify({ messages:[{ role:'user', content:text }] })
-    });
-
-    const ctype = (res.headers.get('content-type') || '').toLowerCase();
-
-    // 1) Ha JSON-t kaptunk (stream nélkül vagy streammel is), akkor csak a reply kell
-    if (ctype.includes('application/json')) {
-      const data = await res.json();
-      const reply = data?.reply ?? data?.answer ?? 'Nincs válasz.';
-      setBotContent(typing, esc(String(reply)));
-      // Ha szeretnéd, itt megjelenítheted a forrásokat is:
-      // renderSources(data?.sources);
-      return;
-    }
-
-    // 2) Egyébként streameljük a választ
-    if (res.body && res.body.getReader) {
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let done = false, acc = '';
-
-      while (!done) {
-        const { value, done: d } = await reader.read();
-        done = d;
-        acc += decoder.decode(value || new Uint8Array(), { stream:true });
-        // élőben írjuk (ha sima szöveg)
-        setBotContent(typing, esc(acc));
-      }
-
-      // ha a végén kiderül, hogy JSON-t streamelt a szerver, akkor azt is kezeld szépen
-      try {
-        const maybeJson = JSON.parse(acc);
-        const reply = maybeJson?.reply ?? maybeJson?.answer;
-        if (reply) {
-          setBotContent(typing, esc(String(reply)));
-          // renderSources(maybeJson?.sources);
-        }
-      } catch {
-        // nem JSON, marad a fenti szöveg
-      }
-      return;
-    }
-
-    // 3) Fallback: nincs stream és nem JSON – próbáljuk szövegként
-    const textBody = await res.text();
-    // ha mégis JSON-nak tűnik:
-    if (textBody.trim().startsWith('{')) {
-      try {
-        const data = JSON.parse(textBody);
-        const reply = data?.reply ?? data?.answer ?? textBody;
-        setBotContent(typing, esc(String(reply)));
-        // renderSources(data?.sources);
-        return;
-      } catch {}
-    }
-    setBotContent(typing, esc(textBody || 'Nincs válasz.'));
-  } catch (err) {
-    setBotContent(typing, `⚠️ Hiba: ${esc(err?.message || String(err))}`);
-  } finally {
-    send.disabled = false;
+    chat.scrollTop = chat.scrollHeight;
   }
-}
-    send.addEventListener('click', doSend);
-    input.addEventListener('keydown', e => { if (e.key === 'Enter') doSend(); });
 
-    renderChips();
-  </script>
+  function addBubble(role, html) {
+    const row = document.createElement('div'); row.className = 'row ' + role;
+    const bubble = document.createElement('div'); bubble.className = 'bubble';
+    bubble.innerHTML = html;
+    row.appendChild(bubble); chat.appendChild(row); chat.scrollTop = chat.scrollHeight;
+    return bubble;
+  }
+
+  function addUser(text) {
+    // a felhasználói üzenetet továbbra is escape-eljük
+    addBubble('user', `<span class="meta">Te • ${now()}</span>${esc(text)}`);
+  }
+
+  function addTyping() {
+    return addBubble('bot', `
+      <span class="meta">Asszisztens • ${now()}</span>
+      <span class="typing">Gondolkodom… <span class="dots"><span class="dot"></span><span class="dot"></span><span class="dot"></span></span></span>
+    `);
+  }
+
+  function renderChips() {
+    chips.innerHTML = '';
+    QUESTIONS.slice(0,4).forEach(q => {
+      const btn = document.createElement('button');
+      btn.className = 'chip'; btn.textContent = q; btn.title = q;
+      btn.onclick = () => { input.value = q; doSend(); };
+      chips.appendChild(btn);
+    });
+  }
+
+  async function doSend() {
+    const text = input.value.trim();
+    if (!text) return;
+
+    addUser(text);
+    input.value = '';
+    input.focus();
+
+    const typing = addTyping();
+    send.disabled = true;
+
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type':'application/json' },
+        body: JSON.stringify({ messages:[{ role:'user', content:text }] })
+      });
+
+      const ctype = (res.headers.get('content-type') || '').toLowerCase();
+
+      // 1) JSON válasz esetén: NINCS ESCAPE -> KaTeX + citations
+      if (ctype.includes('application/json')) {
+        const data = await res.json();
+        const reply = data?.reply ?? data?.answer ?? 'Nincs válasz.';
+        renderAnswer(typing, reply);
+        return;
+      }
+
+      // 2) Stream esetén: közben plain text, a végén KaTeX render
+      if (res.body && res.body.getReader) {
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let done = false, acc = '';
+
+        while (!done) {
+          const { value, done: d } = await reader.read();
+          done = d;
+          acc += decoder.decode(value || new Uint8Array(), { stream:true });
+          // közben egyszerűen kiírjuk (escape-elve, hogy ne villogjon a KaTeX)
+          typing.innerHTML = `<span class="meta">Asszisztens • ${now()}</span>${esc(acc)}`;
+          chat.scrollTop = chat.scrollHeight;
+        }
+
+        // végén szépen rendereljük
+        // ha a szerver JSON-t streamelt, próbáljuk parse-olni
+        try {
+          const maybe = JSON.parse(acc);
+          const reply = maybe?.reply ?? maybe?.answer ?? acc;
+          renderAnswer(typing, reply);
+        } catch {
+          renderAnswer(typing, acc);
+        }
+        return;
+      }
+
+      // 3) Fallback: text
+      const textBody = await res.text();
+      if (textBody.trim().startsWith('{')) {
+        try {
+          const data = JSON.parse(textBody);
+          const reply = data?.reply ?? data?.answer ?? textBody;
+          renderAnswer(typing, reply);
+          return;
+        } catch {}
+      }
+      renderAnswer(typing, textBody || 'Nincs válasz.');
+    } catch (err) {
+      typing.innerHTML = `<span class="meta">Asszisztens • ${now()}</span>⚠️ Hiba: ${esc(err?.message || String(err))}`;
+    } finally {
+      send.disabled = false;
+    }
+  }
+
+  send.addEventListener('click', doSend);
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') doSend(); });
+
+  renderChips();
+</script>
 </body>
 </html>

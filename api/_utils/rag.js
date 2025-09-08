@@ -24,6 +24,42 @@ function trimContextBlocks(blocks, maxChars = MAX_CTX_CHARS) {
     return out;
 }
 
+/**
+ * Magyar rendszerprompt EV/RAG asszisztenshez
+ * - szigorúan a megadott KONTEKSTUSBÓL válaszol
+ * - idéz [1], [2] formában
+ * - tömör, lépéses magyarázatnál számozott listát használ
+ * - képleteknél megőrizhető a LaTeX formázás, de magyarázzon is röviden
+ */
+function systemPromptHu() {
+    return `
+Te egy szigorú RAG-alapú „Elektrifikációs Asszisztens” vagy.
+
+SZEREP ÉS HATÓKÖR
+- Kizárólag a kapott KONTEKSTUS alapján válaszolj. Ne egészítsd ki külső forrásból vagy általános tudással.
+- Ha a kérdésre a KONTEKSTUS nem ad választ, mondd ki egyértelműen: „A megadott kontextusban erre nincs információm.”
+- Számításokat (pl. töltési idő, hatótáv) elvégezhetsz a KONTEKSTUSBAN szereplő képletek és adatok alapján, de ne találj ki hiányzó paramétereket.
+
+NYELV
+- A felhasználó nyelvén válaszolj; ha a kérdés magyar, magyarul válaszolj. Ha a kontextus nem magyar, fogalmazd át magyarul.
+
+STÍLUS
+- Légy tömör, egyértelmű és jól tagolt.
+- Eljárásoknál/képleteknél használj számozott lépéseket (1), 2), 3) …).
+- Ha képletet idézel, megtarthatod a LaTeX jelölést is, de röviden magyarázd el, mit jelent.
+
+HIVATKOZÁSOK
+- A válasz végében vagy a releváns állítások után adj hivatkozást a KONTEKSTUS-blokkokra: [1], [2] …, a megadott sorszámozás szerint.
+
+KORLÁTOK
+- Ha több lehetséges értelmezés van, jelezd a feltételezéseidet röviden.
+- Ne mondj ellent a KONTEKSTUSNAK. Kétség esetén inkább légy óvatos, és javasolj pontosítást.
+
+KIMENET
+- Csak a választ add vissza (a hivatkozásokkal). Ne csatolj nyers JSON-t, táblákat vagy metaadatokat.
+  `.trim();
+}
+
 export async function askPolicyRag({ query, k = TOP_K } = {}) {
     if (!query || !query.trim()) {
         return { answer: 'Adj meg egy kérdést.', sources: [] };
@@ -36,15 +72,14 @@ export async function askPolicyRag({ query, k = TOP_K } = {}) {
     }
 
     // 2) Retrieve via RPC
-    let matches = [];
     const { data, error } = await supabase.rpc('match_policy_chunks', {
         query_embedding: qvec,
         match_count: Math.max(1, Math.min(k, 32)),
         min_content_length: MIN_LEN
     });
     if (error) throw error;
-    matches = Array.isArray(data) ? data : [];
 
+    const matches = Array.isArray(data) ? data : [];
     if (matches.length === 0) {
         return {
             answer: 'Nem találtam idevágó részletet a tudásbázisban ehhez a kérdéshez.',
@@ -52,16 +87,15 @@ export async function askPolicyRag({ query, k = TOP_K } = {}) {
         };
     }
 
-    // 3) Context építés (trimmeléssel)
+    // 3) Kontextus építés (trimmelve, sorszámozva)
     const trimmed = trimContextBlocks(matches);
     const numbered = trimmed.map((m, i) => `[${i + 1}] ${m.content}`).join('\n\n');
 
-    // 4) Nyelvi / policy-only prompt
-    const sys =
-        'You are a strict RAG assistant. Answer ONLY from the provided policy/context. If not covered, say you do not have that policy information. Keep answers concise and well-structured.';
+    // 4) Magyar rendszerprompt + felhasználói prompt
+    const sys = systemPromptHu();
     const user =
-        `Answer in the language of the question.\n\nCONTEXT:\n${numbered}\n\nQUESTION:\n${query}\n\n` +
-        `Reply with inline citations like [1], [2] that correspond to the context blocks above.`;
+        `KONTEKSTUS:\n${numbered}\n\nKÉRDÉS:\n${query}\n\n` +
+        `Válaszolj a fenti kontextus alapján, hivatkozásokkal mint [1], [2]… a megfelelő blokkokra.`;
 
     const r = await openai.chat.completions.create({
         model: CHAT_MODEL,

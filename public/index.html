@@ -126,43 +126,83 @@
       });
     }
 
-    async function doSend() {
-      const text = input.value.trim(); if (!text) return;
-      addUser(text); input.value = ''; input.focus();
-      const typing = addTyping(); send.disabled = true;
+async function doSend() {
+  const text = input.value.trim(); 
+  if (!text) return;
 
-      try {
-        // Streaming POST a saját /api/chat végpontodra
-        const res = await fetch('/api/chat', {
-          method: 'POST',
-          headers: { 'Content-Type':'application/json' },
-          body: JSON.stringify({ messages:[{ role:'user', content:text }] })
-        });
+  addUser(text);
+  input.value = '';
+  input.focus();
 
-        // Ha nem stream, akkor fallback JSON
-        if (!res.body || !res.body.getReader) {
-          const data = await res.json();
-          setBotContent(typing, esc(data.reply || data.answer || 'Nincs válasz.'));
-          return;
-        }
+  const typing = addTyping();
+  send.disabled = true;
 
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder();
-        let done = false, acc = '';
-        // amíg stream jön, rendereljük
-        while (!done) {
-          const { value, done: d } = await reader.read();
-          done = d;
-          acc += decoder.decode(value || new Uint8Array(), { stream:true });
-          setBotContent(typing, esc(acc));
-        }
-      } catch (err) {
-        setBotContent(typing, `⚠️ Hiba: ${esc(err.message || err)}`);
-      } finally {
-        send.disabled = false;
-      }
+  try {
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type':'application/json' },
+      body: JSON.stringify({ messages:[{ role:'user', content:text }] })
+    });
+
+    const ctype = (res.headers.get('content-type') || '').toLowerCase();
+
+    // 1) Ha JSON-t kaptunk (stream nélkül vagy streammel is), akkor csak a reply kell
+    if (ctype.includes('application/json')) {
+      const data = await res.json();
+      const reply = data?.reply ?? data?.answer ?? 'Nincs válasz.';
+      setBotContent(typing, esc(String(reply)));
+      // Ha szeretnéd, itt megjelenítheted a forrásokat is:
+      // renderSources(data?.sources);
+      return;
     }
 
+    // 2) Egyébként streameljük a választ
+    if (res.body && res.body.getReader) {
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let done = false, acc = '';
+
+      while (!done) {
+        const { value, done: d } = await reader.read();
+        done = d;
+        acc += decoder.decode(value || new Uint8Array(), { stream:true });
+        // élőben írjuk (ha sima szöveg)
+        setBotContent(typing, esc(acc));
+      }
+
+      // ha a végén kiderül, hogy JSON-t streamelt a szerver, akkor azt is kezeld szépen
+      try {
+        const maybeJson = JSON.parse(acc);
+        const reply = maybeJson?.reply ?? maybeJson?.answer;
+        if (reply) {
+          setBotContent(typing, esc(String(reply)));
+          // renderSources(maybeJson?.sources);
+        }
+      } catch {
+        // nem JSON, marad a fenti szöveg
+      }
+      return;
+    }
+
+    // 3) Fallback: nincs stream és nem JSON – próbáljuk szövegként
+    const textBody = await res.text();
+    // ha mégis JSON-nak tűnik:
+    if (textBody.trim().startsWith('{')) {
+      try {
+        const data = JSON.parse(textBody);
+        const reply = data?.reply ?? data?.answer ?? textBody;
+        setBotContent(typing, esc(String(reply)));
+        // renderSources(data?.sources);
+        return;
+      } catch {}
+    }
+    setBotContent(typing, esc(textBody || 'Nincs válasz.'));
+  } catch (err) {
+    setBotContent(typing, `⚠️ Hiba: ${esc(err?.message || String(err))}`);
+  } finally {
+    send.disabled = false;
+  }
+}
     send.addEventListener('click', doSend);
     input.addEventListener('keydown', e => { if (e.key === 'Enter') doSend(); });
 

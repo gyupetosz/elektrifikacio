@@ -4,60 +4,85 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Elektrifikáció Asszisztens</title>
-  <style>
+ <style>
+  :root{
+    --bg:#f5f7fb; --panel:#ffffff;
+    --navy:#2f3a67; --navy-d:#1e2750; --gold:#d9a441;
+    --muted:#8a8f98; --text:#1f2937;
+    --bubble-user:#e8eefc; --bubble-bot:#ffffff;
+    --ring:rgba(47,58,103,.15); --shadow:0 12px 40px rgba(16,24,40,.08);
+    --radius:18px;
+
+    /* ÚJ: olvashatósági változók */
+    --font-bubble: 17px; /* chatbuborékok */
+    --font-chip:   15px; /* ajánló chipek */
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+       font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,"Helvetica Neue",Arial;}
+  .shell{max-width:920px;margin:24px auto;background:var(--panel);border-radius:16px;
+         box-shadow:var(--shadow);overflow:hidden}
+  .header{background:linear-gradient(135deg,var(--navy),var(--navy-d));color:#fff;
+          padding:14px 16px;display:flex;align-items:center;gap:10px}
+  .brand{font-weight:800;letter-spacing:.2px}
+  .badge{margin-left:auto;font-size:12px;opacity:.85;color:#f5e7b6}
+  .chat{height:64vh;min-height:380px;background:#f8fafc;padding:18px;overflow-y:auto}
+
+  /* chips */
+  .chips{display:flex;flex-wrap:wrap;gap:10px;padding:10px 14px;background:#fff;border-top:1px solid #eef2f7}
+  .chip{
+    border:1px solid #e5e7eb;background:#f9fafb;color:#374151;border-radius:14px;
+    padding:12px 14px; /* nagyobb tappolható felület */
+    cursor:pointer;
+    font-size:var(--font-chip); /* NÖVELT betűméret */
+  }
+  .chip:hover{background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.05)}
+
+  /* composer */
+  .composer{display:flex;gap:10px;padding:14px;background:#fff;border-top:1px solid #eef2f7}
+  .input{flex:1;border:1px solid #e5e7eb;border-radius:14px;padding:12px 14px;outline:0}
+  .input:focus{border-color:#dbe4f3;box-shadow:0 0 0 4px var(--ring)}
+  .send{background:var(--navy);color:var(--gold);border:0;border-radius:12px;padding:0 18px;font-weight:700;cursor:pointer}
+  .send:disabled{opacity:.6;cursor:not-allowed}
+  .tip{font-size:12px;color:var(--muted);text-align:center;padding:6px 0 14px}
+
+  /* bubbles */
+  .row{display:flex;margin:8px 0}
+  .row.user{justify-content:flex-end}
+  .bubble{
+    max-width:78%;padding:12px 14px;border-radius:var(--radius);box-shadow:0 2px 10px rgba(0,0,0,.04);
+    font-size:var(--font-bubble); /* NÖVELT betűméret */
+    line-height:1.65;             /* kényelmesebb sortáv */
+  }
+  .user .bubble{background:var(--bubble-user);border-bottom-right-radius:6px}
+  .bot  .bubble{background:var(--bubble-bot);border-bottom-left-radius:6px}
+  .meta{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
+
+  /* typing */
+  .typing{display:inline-flex;align-items:center;gap:8px;color:var(--muted)}
+  .dots{display:inline-flex;gap:4px}
+  .dot{width:6px;height:6px;border-radius:50%;background:#9c7a25;opacity:.3;animation:blink 1.2s infinite ease-in-out}
+  .dot:nth-child(2){animation-delay:.15s}
+  .dot:nth-child(3){animation-delay:.3s}
+
+  /* citations */
+  .cite{color:#94a3b8;font-size:.8em}
+
+  @keyframes blink{0%,80%,100%{opacity:.25}40%{opacity:1}}
+
+  @media (max-width:640px){
+    .shell{border-radius:0;margin:0}
+    .chat{height:70vh}
+    .bubble{max-width:86%}
+
+    /* Mobilon még nagyobb méretek az olvashatóság érdekében */
     :root{
-      --bg:#f5f7fb; --panel:#ffffff;
-      --navy:#2f3a67; --navy-d:#1e2750; --gold:#d9a441;
-      --muted:#8a8f98; --text:#1f2937;
-      --bubble-user:#e8eefc; --bubble-bot:#ffffff;
-      --ring:rgba(47,58,103,.15); --shadow:0 12px 40px rgba(16,24,40,.08);
-      --radius:18px;
+      --font-bubble: 18px;
+      --font-chip:   16px;
     }
-    *{box-sizing:border-box}
-    body{margin:0;background:var(--bg);color:var(--text);
-         font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,"Helvetica Neue",Arial;}
-    .shell{max-width:920px;margin:24px auto;background:var(--panel);border-radius:16px;
-           box-shadow:var(--shadow);overflow:hidden}
-    .header{background:linear-gradient(135deg,var(--navy),var(--navy-d));color:#fff;
-            padding:14px 16px;display:flex;align-items:center;gap:10px}
-    .brand{font-weight:800;letter-spacing:.2px}
-    .badge{margin-left:auto;font-size:12px;opacity:.85;color:#f5e7b6}
-    .chat{height:64vh;min-height:380px;background:#f8fafc;padding:18px;overflow-y:auto}
+  }
+</style>
 
-    /* chips */
-    .chips{display:flex;flex-wrap:wrap;gap:10px;padding:10px 14px;background:#fff;border-top:1px solid #eef2f7}
-    .chip{border:1px solid #e5e7eb;background:#f9fafb;color:#374151;border-radius:14px;padding:10px 12px;cursor:pointer}
-    .chip:hover{background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.05)}
-
-    /* composer */
-    .composer{display:flex;gap:10px;padding:14px;background:#fff;border-top:1px solid #eef2f7}
-    .input{flex:1;border:1px solid #e5e7eb;border-radius:14px;padding:12px 14px;outline:0}
-    .input:focus{border-color:#dbe4f3;box-shadow:0 0 0 4px var(--ring)}
-    .send{background:var(--navy);color:var(--gold);border:0;border-radius:12px;padding:0 18px;font-weight:700;cursor:pointer}
-    .send:disabled{opacity:.6;cursor:not-allowed}
-    .tip{font-size:12px;color:var(--muted);text-align:center;padding:6px 0 14px}
-
-    /* bubbles */
-    .row{display:flex;margin:8px 0}
-    .row.user{justify-content:flex-end}
-    .bubble{max-width:78%;padding:12px 14px;border-radius:var(--radius);box-shadow:0 2px 10px rgba(0,0,0,.04)}
-    .user .bubble{background:var(--bubble-user);border-bottom-right-radius:6px}
-    .bot  .bubble{background:var(--bubble-bot);border-bottom-left-radius:6px}
-    .meta{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
-
-    /* typing */
-    .typing{display:inline-flex;align-items:center;gap:8px;color:var(--muted)}
-    .dots{display:inline-flex;gap:4px}
-    .dot{width:6px;height:6px;border-radius:50%;background:#9c7a25;opacity:.3;animation:blink 1.2s infinite ease-in-out}
-    .dot:nth-child(2){animation-delay:.15s}
-    .dot:nth-child(3){animation-delay:.3s}
-
-    /* citations */
-    .cite{color:#94a3b8;font-size:.8em}
-
-    @keyframes blink{0%,80%,100%{opacity:.25}40%{opacity:1}}
-    @media (max-width:640px){.shell{border-radius:0;margin:0}.chat{height:70vh}.bubble{max-width:86%}}
-  </style>
 
   <!-- KaTeX for math -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
@@ -205,6 +230,11 @@
     });
     suggestionOffset = (suggestionOffset + 4) % SUGGESTIONS.length;
   }
+
+function cleanCitations(text) {
+  // Removes [1], [23], etc.
+  return text.replace(/\[\d+\]/g, '');
+}
 
   /* ===== chat send ===== */
   async function doSend(){

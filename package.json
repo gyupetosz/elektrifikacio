@@ -1,7 +1,7 @@
 {
   "type": "module",
   "dependencies": {
-    "@supabase/supabase-js": "^2.54.0",
+    "@supabase/supabase-js": "^2.57.2",
     "dotenv": "^16.6.1",
     "node-fetch": "^2.7.0",
     "node-html-parser": "^7.0.1",
@@ -10,5 +10,9 @@
   },
   "scripts": {
     "index:one": "node scripts/index-one.mjs"
+  },
+  "devDependencies": {
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2"
   }
 }

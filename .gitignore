@@ -1,0 +1,10 @@
+# envs
+.env
+.env.*
+!.env.example
+
+# deps
+node_modules/
+
+# log/output
+npm-debug.log*

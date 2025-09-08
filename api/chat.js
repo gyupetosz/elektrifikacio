@@ -1,3 +1,4 @@
+// api/chat.js
 import { askPolicyRag } from './_utils/rag.js';
 
 function setCors(res) {
@@ -22,6 +23,14 @@ function pickQuery(body) {
     );
 }
 
+// Remove inline [n] citations like [1], [12] (and optional leading space)
+function stripCitations(s = '') {
+    return String(s)
+        .replace(/\s?\[\d+\]/g, '')     // remove [1], [23]
+        .replace(/[ ]{2,}/g, ' ')       // collapse double spaces left behind
+        .trim();
+}
+
 export default async function handler(req, res) {
     setCors(res);
     if (req.method === 'OPTIONS') return res.status(200).end();
@@ -32,7 +41,7 @@ export default async function handler(req, res) {
         if (typeof body === 'string') {
             try { body = JSON.parse(body); } catch { body = {}; }
         } else if (!body) {
-            // fallback: olvassuk be a streamet
+            // Fallback: read the stream body (rare on some runtimes)
             const chunks = [];
             for await (const c of req) chunks.push(Buffer.from(c));
             const raw = Buffer.concat(chunks).toString('utf8');
@@ -47,9 +56,13 @@ export default async function handler(req, res) {
             k: Number(process.env.RAG_TOP_K ?? 6)
         });
 
+        // Strip [n] markers from the model's reply before returning
+        const cleaned = stripCitations(result?.answer ?? '');
+
         return res.status(200).json({
-            reply: result.answer,
-            sources: result.sources
+            reply: cleaned,
+            // Keep sources in payload (handy for logs/QA), or remove if you don't want to expose them:
+            sources: result?.sources ?? []
         });
     } catch (e) {
         console.error('chat handler error:', e);

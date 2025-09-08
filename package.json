@@ -1,18 +1,18 @@
 {
-  "type": "module",
-  "dependencies": {
-    "@supabase/supabase-js": "^2.57.2",
-    "dotenv": "^16.6.1",
-    "node-fetch": "^2.7.0",
-    "node-html-parser": "^7.0.1",
-    "openai": "^4.104.0",
-    "pdf-parse": "^1.1.1"
-  },
+  "name": "elektrifikacio",
+  "private": true,
   "scripts": {
-    "index:one": "node scripts/index-one.mjs"
+    "build": "echo \"no build\"",
+    "start": "serve -s .",
+    "ingest:md": "node scripts/ingest.mjs docs",
+    "ingest:pdf": "node scripts/ingest_pdf.mjs docs"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0",
+    "dotenv": "^16.4.5",
+    "openai": "^4.57.0"
   },
   "devDependencies": {
-    "tsx": "^4.20.5",
-    "typescript": "^5.9.2"
+    "serve": "^14.2.3"
   }
 }

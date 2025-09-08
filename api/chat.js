@@ -1,4 +1,4 @@
-import { answerWithRag } from './_utils/rag.js';
+import { askPolicyRag } from './_utils/rag.js';
 
 function setCors(res) {
   res.setHeader('Access-Control-Allow-Origin', '*');

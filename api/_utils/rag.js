@@ -78,8 +78,7 @@ export async function askPolicyRag({ query, k = TOP_K } = {}) {
     let data, error;
     if (USE_HYBRID) {
 
-        ({ data, error } = await supabase.rpc('match_policy_chunks_hybrid', {
-            query_text: query,
+        ({ data, error } = await supabase.rpc('match_policy_chunks', {
             query_embedding: qvec,
             match_count: Math.max(1, Math.min(k, 32)),
             min_content_length: MIN_LEN,

@@ -71,27 +71,45 @@ export async function askPolicyRag({ query, k = TOP_K } = {}) {
     // 1) Embed
     const qvec = await embedQuery(query);
     if (!Array.isArray(qvec) || qvec.length !== EMBEDDING_DIM) {
-        throw new Error('Embedding dimension mismatch; check model & SQL schema.');
+        throw new Error(`Embedding dimension mismatch (got ${qvec?.length}, want ${EMBEDDING_DIM}); check model & SQL schema.`);
     }
 
     // 2) Retrieve
     let data, error;
-    if (USE_HYBRID) {
 
-        ({ data, error } = await supabase.rpc('match_policy_chunks', {
+    if (USE_HYBRID) {
+        // Próbáld a hibrid RPC-t
+        ({ data, error } = await supabase.rpc('match_policy_chunks_hybrid', {
+            query_text: query,             
             query_embedding: qvec,
             match_count: Math.max(1, Math.min(k, 32)),
             min_content_length: MIN_LEN,
         }));
+
+        // Ha nincs ilyen RPC / jogosultság gond / bármilyen futáshiba: ess vissza embedding-only-ra
+        if (error) {
+            console.warn('[RAG] hybrid RPC failed, falling back to embedding-only:', {
+                code: error.code, details: error.details, hint: error.hint, message: error.message
+            });
+            ({ data, error } = await supabase.rpc('match_policy_chunks', {
+                query_embedding: qvec,
+                match_count: Math.max(1, Math.min(k, 32)),
+                min_content_length: MIN_LEN,
+            }));
+        }
     } else {
-        // eredeti embedding-only RPC
+        // Eredeti embedding-only RPC
         ({ data, error } = await supabase.rpc('match_policy_chunks', {
             query_embedding: qvec,
             match_count: Math.max(1, Math.min(k, 32)),
             min_content_length: MIN_LEN,
         }));
     }
-    if (error) throw error;
+
+    if (error) {
+        // Adj vissza értelmes hibát, hogy gyorsabban tudd debugolni
+        throw new Error(`RAG RPC failed: ${error.message} (code=${error.code}, details=${error.details || 'n/a'})`);
+    }
 
     const matches = Array.isArray(data) ? data : [];
     if (matches.length === 0) {

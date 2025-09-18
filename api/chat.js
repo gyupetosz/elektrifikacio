@@ -1,13 +1,12 @@
 // api/chat.js
 import { askPolicyRag } from './_utils/rag.js';
+import { RAG_CONFIG } from './_utils/rag_config.js';
 
 function setCors(res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
 }
-
-const STRIP_CITATIONS = process.env.STRIP_CITATIONS === '1';
 
 function pickQuery(body) { /* változatlan */ }
 
@@ -40,10 +39,10 @@ export default async function handler(req, res) {
 
         const result = await askPolicyRag({
             query,
-            k: Number(process.env.RAG_TOP_K ?? 10) 
+            k: Number(RAG_CONFIG.RAG_TOP_K) ?? 10
         });
 
-        const reply = STRIP_CITATIONS
+    const reply = RAG_CONFIG.STRIP_CITATIONS
             ? stripCitations(result?.answer ?? '')
             : (result?.answer ?? '');
 

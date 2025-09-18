@@ -2,14 +2,16 @@
 import OpenAI from 'openai';
 import { supabase } from './supabase.js';
 import { embedQuery, EMBEDDING_DIM } from './embeddings.js';  // returns 1536-dim array
+import { RAG_CONFIG } from './rag_config.js';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-const CHAT_MODEL = process.env.CHAT_MODEL || 'gpt-4o-mini';
-const TOP_K = Math.min(Number(process.env.RAG_TOP_K || 10), 16);
-const MIN_LEN = Number(process.env.RAG_MIN_CHUNK_LENGTH || 20);
-const MAX_CTX_CHARS = Number(process.env.RAG_MAX_CTX_CHARS || 8000); // kb. 5–6k token
-const USE_HYBRID = process.env.RAG_USE_HYBRID === '1';
+const CHAT_MODEL = RAG_CONFIG.CHAT_MODEL;
+const TOP_K = Math.min(Number(RAG_CONFIG.RAG_TOP_K), 16);
+const MIN_LEN = Number(RAG_CONFIG.RAG_MIN_CHUNK_LENGTH);
+const MAX_CTX_CHARS = Number(RAG_CONFIG.RAG_MAX_CTX_CHARS);
+const USE_HYBRID = !!RAG_CONFIG.RAG_USE_HYBRID;
+const DEBUG = !!RAG_CONFIG.RAG_DEBUG;
 
 function trimContextBlocks(blocks, maxChars = MAX_CTX_CHARS) {
     const out = [];

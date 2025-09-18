@@ -51,6 +51,21 @@ function norm(t) {
         .replace(/[ \u00A0]+/g, ' ').replace(/\u0000/g, '').trim();
 }
 
+function extractNumberedQAPairs(textRaw) {
+    const text = norm(textRaw);
+    // Matches blocks like:
+    // "12. Mit … ?" → (captures the question)
+    //  ...answer lines until the next "N. Something?" or end of text
+    const re = /(?:^|\n)\s*\d+\.\s+(.+?\?)\s*\n([\s\S]*?)(?=(?:\n\s*\d+\.\s+.+?\?)|$)/g;
+    const pairs = [];
+    let m;
+    while ((m = re.exec(text)) !== null) {
+        const q = m[1].trim();
+        const a = m[2].trim();
+        if (q && a) pairs.push({ q, a });
+    }
+    return pairs;
+}
 function extractQAPairs(textRaw) {
     const text = norm(textRaw);
     const splitOnQ = new RegExp(`(?:\\n|^)\\s*(?:${Q_LABEL.source})`, 'i');
@@ -70,33 +85,17 @@ function extractQAPairs(textRaw) {
     return pairs;
 }
 
-function freeTextChunks(textRaw) {
-    const paras = norm(textRaw).split(/\n{2,}/).map(p => p.trim()).filter(Boolean);
-    const splitSentences = (p) =>
-        p.replace(/\s+/g, ' ')
-            .split(/(?<=[\.!?])\s+(?=[A-ZÁÉÍÓÖŐÚÜŰ„(0-9])/)
-            .map(s => s.trim()).filter(Boolean);
-    const sents = paras.flatMap(splitSentences);
-
+function charChunks(textRaw, maxLen = 900, overlap = 150) {
+    // Keep newlines/spaces; only normalize Windows newlines.
+    const text = String(textRaw).replace(/\r/g, '');
     const chunks = [];
-    let buf = '';
-    for (const s of sents) {
-        if ((buf ? buf + ' ' : '').concat(s).length <= CHUNK_MAX) {
-            buf = (buf ? buf + ' ' : '') + s;
-        } else {
-            if (buf) chunks.push(buf);
-            buf = s;
-        }
-    }
-    if (buf) chunks.push(buf);
+    const step = Math.max(1, maxLen - overlap);
+    let start = 0;
 
-    if (OVERLAP > 0 && chunks.length > 1) {
-        const withOverlap = [];
-        for (let i = 0; i < chunks.length; i++) {
-            const prevTail = i > 0 ? chunks[i - 1].slice(-OVERLAP) : '';
-            withOverlap.push((prevTail ? prevTail + ' ' : '') + chunks[i]);
-        }
-        return withOverlap;
+    while (start < text.length) {
+        const end = Math.min(text.length, start + maxLen);
+        chunks.push(text.slice(start, end));
+        start += step;
     }
     return chunks;
 }
@@ -118,31 +117,30 @@ async function insertChunk(document_id, idx, content) {
         document_id, chunk_index: idx, content, embedding: emb
     });
     if (error) throw error;
+    if (idx % 10 === 0) console.log(`… inserted chunk #${idx}`);
 }
 
 async function ingestPdfFile(filePath) {
     const buf = await fs.readFile(path.resolve(filePath));
     const parsed = await pdf(buf);
-    const text = parsed.text || '';
+    const text = typeof parsed.text === 'string' ? parsed.text : '';
 
     const doc = await upsertDocument({
         title: path.basename(filePath),
         pathStr: filePath
     });
 
-    const qa = extractQAPairs(text);
-    if (qa.length > 0) {
-        let i = 0;
-        for (const { q, a } of qa) {
-            await insertChunk(doc.id, i++, `Question/Kérdés: ${q}\nAnswer/Válasz: ${a}`);
-        }
-        console.log(`✓ PDF Q/A: ${path.basename(filePath)} → ${qa.length} blocks`);
-        return;
+    // Always chunk the full text; do not try to extract Q/A.
+    const chunks = charChunks(text, CHUNK_MAX, OVERLAP);
+
+    console.log(`Chunking "${path.basename(filePath)}" → ${chunks.length} chunks`);
+
+    let i = 0;
+    for (const c of chunks) {
+        await insertChunk(doc.id, i++, c);
     }
 
-    const chunks = freeTextChunks(text).filter(c => c.trim().length >= 20);
-    let i = 0; for (const c of chunks) await insertChunk(doc.id, i++, c);
-    console.log(`✓ PDF free text: ${path.basename(filePath)} → ${chunks.length} chunks`);
+    console.log(`✓ PDF full text: ${path.basename(filePath)} → ${chunks.length} chunks`);
 }
 
 async function main() {

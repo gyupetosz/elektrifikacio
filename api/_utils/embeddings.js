@@ -1,10 +1,14 @@
 ﻿import OpenAI from 'openai';
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
+export const EMBEDDING_MODEL = process.env.EMBEDDING_MODEL || 'text-embedding-3-small';
+export const EMBEDDING_DIM = 1536; // 3-small és ada-002 is 1536, de a terek NEM kompatibilisek!
+
 export async function embedQuery(text) {
+    const input = typeof text === 'string' ? text : String(text ?? '');
     const r = await openai.embeddings.create({
-        model: 'text-embedding-3-small',
-        input: text
+        model: EMBEDDING_MODEL,
+        input,
     });
     return r.data[0].embedding;
 }

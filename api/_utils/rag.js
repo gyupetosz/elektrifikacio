@@ -1,15 +1,16 @@
 ﻿// api/_utils/policy_rag.mjs
 import OpenAI from 'openai';
-import { supabase } from './supabase.js';      // server-side client (service role)
-import { embedQuery } from './embeddings.js';  // returns 1536-dim array
+import { supabase } from './supabase.js';
+import { embedQuery, EMBEDDING_DIM } from './embeddings.js';  // returns 1536-dim array
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 const CHAT_MODEL = process.env.CHAT_MODEL || 'gpt-4o-mini';
 const EMBEDDING_DIM = 1536;
-const TOP_K = Math.min(Number(process.env.RAG_TOP_K || 6), 16);
+const TOP_K = Math.min(Number(process.env.RAG_TOP_K || 10), 16);
 const MIN_LEN = Number(process.env.RAG_MIN_CHUNK_LENGTH || 20);
 const MAX_CTX_CHARS = Number(process.env.RAG_MAX_CTX_CHARS || 8000); // kb. 5–6k token
+const USE_HYBRID = process.env.RAG_USE_HYBRID === '1';
 
 function trimContextBlocks(blocks, maxChars = MAX_CTX_CHARS) {
     const out = [];
@@ -36,9 +37,10 @@ function systemPromptHu() {
 Te egy szigorú RAG-alapú „Elektrifikációs Asszisztens” vagy.
 
 SZEREP ÉS HATÓKÖR
-- Kizárólag a kapott KONTEKSTUS alapján válaszolj. Ne egészítsd ki külső forrásból vagy általános tudással.
-- Ha a kérdésre a KONTEKSTUS nem ad választ, mondd ki egyértelműen: „A megadott kontextusban erre nincs információm.”
+- Elsődlegesen a megadott KONTEKSTUS alapján válaszolj.
+- Ha a kérdésre nincs szó szerinti válasz, de a KONTEKSTUS tartalmaz tartalmilag egyenértékű állítást vagy definíciót, add meg a választ parafrázisban a megfelelő hivatkozással.
 - Számításokat (pl. töltési idő, hatótáv) elvégezhetsz a KONTEKSTUSBAN szereplő képletek és adatok alapján, de ne találj ki hiányzó paramétereket.
+
 
 NYELV
 - A felhasználó nyelvén válaszolj; ha a kérdés magyar, magyarul válaszolj. Ha a kontextus nem magyar, fogalmazd át magyarul.
@@ -54,6 +56,7 @@ HIVATKOZÁSOK
 KORLÁTOK
 - Ha több lehetséges értelmezés van, jelezd a feltételezéseidet röviden.
 - Ne mondj ellent a KONTEKSTUSNAK. Kétség esetén inkább légy óvatos, és javasolj pontosítást.
+- Ha nincs EGYÁLTALÁN releváns információ, mondd ki: „A megadott kontextusban erre nincs információm.”
 
 KIMENET
 - Csak a választ add vissza (a hivatkozásokkal). Ne csatolj nyers JSON-t, táblákat vagy metaadatokat.
@@ -71,12 +74,24 @@ export async function askPolicyRag({ query, k = TOP_K } = {}) {
         throw new Error('Embedding dimension mismatch; check model & SQL schema.');
     }
 
-    // 2) Retrieve via RPC
-    const { data, error } = await supabase.rpc('match_policy_chunks', {
-        query_embedding: qvec,
-        match_count: Math.max(1, Math.min(k, 32)),
-        min_content_length: MIN_LEN
-    });
+    // 2) Retrieve
+    let data, error;
+    if (USE_HYBRID) {
+
+        ({ data, error } = await supabase.rpc('match_policy_chunks_hybrid', {
+            query_text: query,
+            query_embedding: qvec,
+            match_count: Math.max(1, Math.min(k, 32)),
+            min_content_length: MIN_LEN,
+        }));
+    } else {
+        // eredeti embedding-only RPC
+        ({ data, error } = await supabase.rpc('match_policy_chunks', {
+            query_embedding: qvec,
+            match_count: Math.max(1, Math.min(k, 32)),
+            min_content_length: MIN_LEN,
+        }));
+    }
     if (error) throw error;
 
     const matches = Array.isArray(data) ? data : [];
@@ -87,15 +102,13 @@ export async function askPolicyRag({ query, k = TOP_K } = {}) {
         };
     }
 
-    // 3) Kontextus építés (trimmelve, sorszámozva)
+    // 3) Kontextus építés
     const trimmed = trimContextBlocks(matches);
     const numbered = trimmed.map((m, i) => `[${i + 1}] ${m.content}`).join('\n\n');
 
-    // 4) Magyar rendszerprompt + felhasználói prompt
+    // 4) Prompt + válasz
     const sys = systemPromptHu();
-    const user =
-        `KONTEKSTUS:\n${numbered}\n\nKÉRDÉS:\n${query}\n\n` +
-        `Válaszolj a fenti kontextus alapján, hivatkozásokkal mint [1], [2]… a megfelelő blokkokra.`;
+    const user = `KONTEKSTUS:\n${numbered}\n\nKÉRDÉS:\n${query}\n\nVálaszolj a fenti kontextus alapján, hivatkozásokkal mint [1], [2]… a megfelelő blokkokra.`;
 
     const r = await openai.chat.completions.create({
         model: CHAT_MODEL,
@@ -103,14 +116,13 @@ export async function askPolicyRag({ query, k = TOP_K } = {}) {
             { role: 'system', content: sys },
             { role: 'user', content: user }
         ],
-        temperature: 0.2
+        temperature: 0.3
     });
 
     const answer = r.choices?.[0]?.message?.content ?? '';
 
     return {
         answer,
-        // stabil számozás a [1]..[n]-hez
         sources: trimmed.map((m, i) => ({
             index: i + 1,
             id: m.id,

@@ -7,27 +7,15 @@ function setCors(res) {
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
 }
 
-function pickQuery(body) {
-    if (!body) return '';
-    if (Array.isArray(body.messages) && body.messages.length) {
-        const last = body.messages[body.messages.length - 1];
-        if (last && typeof last.content === 'string' && last.content.trim()) {
-            return last.content.trim();
-        }
-    }
-    return (
-        body.query?.toString().trim() ||
-        body.message?.toString().trim() ||
-        body.text?.toString().trim() ||
-        ''
-    );
-}
+const STRIP_CITATIONS = process.env.STRIP_CITATIONS === '1';
 
-// Remove inline [n] citations like [1], [12] (and optional leading space)
+function pickQuery(body) { /* változatlan */ }
+
+// Remove inline [n] citations like [1], [12]
 function stripCitations(s = '') {
     return String(s)
-        .replace(/\s?\[\d+\]/g, '')     // remove [1], [23]
-        .replace(/[ ]{2,}/g, ' ')       // collapse double spaces left behind
+        .replace(/\s?\[\d+\]/g, '')
+        .replace(/[ ]{2,}/g, ' ')
         .trim();
 }
 
@@ -41,7 +29,6 @@ export default async function handler(req, res) {
         if (typeof body === 'string') {
             try { body = JSON.parse(body); } catch { body = {}; }
         } else if (!body) {
-            // Fallback: read the stream body (rare on some runtimes)
             const chunks = [];
             for await (const c of req) chunks.push(Buffer.from(c));
             const raw = Buffer.concat(chunks).toString('utf8');
@@ -53,15 +40,15 @@ export default async function handler(req, res) {
 
         const result = await askPolicyRag({
             query,
-            k: Number(process.env.RAG_TOP_K ?? 6)
+            k: Number(process.env.RAG_TOP_K ?? 10) 
         });
 
-        // Strip [n] markers from the model's reply before returning
-        const cleaned = stripCitations(result?.answer ?? '');
+        const reply = STRIP_CITATIONS
+            ? stripCitations(result?.answer ?? '')
+            : (result?.answer ?? '');
 
         return res.status(200).json({
-            reply: cleaned,
-            // Keep sources in payload (handy for logs/QA), or remove if you don't want to expose them:
+            reply,
             sources: result?.sources ?? []
         });
     } catch (e) {

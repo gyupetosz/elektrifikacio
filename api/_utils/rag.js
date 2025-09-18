@@ -18,7 +18,7 @@ function trimContextBlocks(blocks, maxChars = MAX_CTX_CHARS) {
     let used = 0;
     for (const b of blocks) {
         // kemény limit blokk-szinten (pl. 1200 char)
-        const clipped = b.content.length > 1200 ? b.content.slice(0, 1200) + '…' : b.content;
+        const clipped = b.content.length > 700 ? b.content.slice(0, 700) + '…' : b.content;
         if (used + clipped.length > maxChars) break;
         out.push({ ...b, content: clipped });
         used += clipped.length;
@@ -134,7 +134,9 @@ export async function askPolicyRag({ query, k = TOP_K } = {}) {
             { role: 'system', content: sys },
             { role: 'user', content: user }
         ],
-        temperature: 0.3
+        temperature: 0.3,
+        max_tokens: 250
+
     });
 
     const answer = r.choices?.[0]?.message?.content ?? '';

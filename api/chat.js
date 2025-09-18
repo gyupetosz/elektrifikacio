@@ -11,7 +11,6 @@ function setCors(res) {
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
 }
 
-
 function pickQuery(body) {
     if (!body) return '';
     // OpenAI Chat formátum

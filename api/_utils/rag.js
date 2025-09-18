@@ -6,7 +6,6 @@ import { embedQuery, EMBEDDING_DIM } from './embeddings.js';  // returns 1536-di
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 const CHAT_MODEL = process.env.CHAT_MODEL || 'gpt-4o-mini';
-const EMBEDDING_DIM = 1536;
 const TOP_K = Math.min(Number(process.env.RAG_TOP_K || 10), 16);
 const MIN_LEN = Number(process.env.RAG_MIN_CHUNK_LENGTH || 20);
 const MAX_CTX_CHARS = Number(process.env.RAG_MAX_CTX_CHARS || 8000); // kb. 5–6k token

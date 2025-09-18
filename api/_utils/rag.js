@@ -56,7 +56,7 @@ KORLÁTOK
 - Ne térj vissza [..] hivatkozásokkal.
 
 KIMENET
-- Csak a választ add vissza (a hivatkozásokkal). Ne csatolj nyers JSON-t, táblákat vagy metaadatokat.
+- Csak a választ add vissza. Ne csatolj nyers JSON-t, táblákat vagy metaadatokat.
   `.trim();
 }
 

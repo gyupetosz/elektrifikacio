@@ -122,7 +122,7 @@ export async function askPolicyRag({ query, k = TOP_K } = {}) {
 
     // 4) Prompt + válasz
     const sys = systemPromptHu();
-    const user = `KONTEKSTUS:\n${numbered}\n\nKÉRDÉS:\n${query}\n\nVálaszolj a fenti kontextus alapján, hivatkozásokkal mint [1], [2]… a megfelelő blokkokra.`;
+    const user = `KONTEKSTUS:\n${numbered}\n\nKÉRDÉS:\n${query}\n\nVálaszolj a fenti kontextus alapján.`;
 
     const r = await openai.chat.completions.create({
         model: CHAT_MODEL,

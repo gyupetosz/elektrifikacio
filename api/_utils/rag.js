@@ -140,7 +140,7 @@ export async function askPolicyRag({ query, k = TOP_K } = {}) {
             { role: 'user', content: user }
         ],
         temperature: 0.5,  // Less rigid responses
-        max_tokens: 400    // Allow longer complete answers
+        max_tokens: 800    // Allow longer complete answers
 
     });
 

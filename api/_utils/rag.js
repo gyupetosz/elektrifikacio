@@ -17,8 +17,8 @@ function trimContextBlocks(blocks, maxChars = MAX_CTX_CHARS) {
     const out = [];
     let used = 0;
     for (const b of blocks) {
-        // kemény limit blokk-szinten (pl. 1200 char)
-        const clipped = b.content.length > 700 ? b.content.slice(0, 700) + '…' : b.content;
+        // kemény limit blokk-szinten - increased for better context
+        const clipped = b.content.length > 900 ? b.content.slice(0, 900) + '…' : b.content;
         if (used + clipped.length > maxChars) break;
         out.push({ ...b, content: clipped });
         used += clipped.length;
@@ -118,6 +118,15 @@ export async function askPolicyRag({ query, k = TOP_K } = {}) {
 
     // 3) Kontextus építés
     const trimmed = trimContextBlocks(matches);
+
+    // Validate we have meaningful context
+    if (trimmed.length === 0 || trimmed.every(m => !m.content?.trim())) {
+        return {
+            answer: 'Nem találtam megfelelő minőségű információt ehhez a kérdéshez. Próbálj meg máshogy megfogalmazni!',
+            sources: []
+        };
+    }
+
     const numbered = trimmed.map((m, i) => `[${i + 1}] ${m.content}`).join('\n\n');
 
     // 4) Prompt + válasz
@@ -130,8 +139,8 @@ export async function askPolicyRag({ query, k = TOP_K } = {}) {
             { role: 'system', content: sys },
             { role: 'user', content: user }
         ],
-        temperature: 0.3,
-        max_tokens: 250
+        temperature: 0.5,  // Less rigid responses
+        max_tokens: 400    // Allow longer complete answers
 
     });
 

@@ -47,7 +47,7 @@ NYELV
 STÍLUS
 - Légy tömör, egyértelmű és jól tagolt.
 - Eljárásoknál/képleteknél használj számozott lépéseket (1), 2), 3) …).
-- Ha képletet idézel, megtarthatod a LaTeX jelölést is, de röviden magyarázd el, mit jelent.
+- TILOS LaTeX formátumot használni ([ ] vagy $$ $$). Egyszerű szöveges formában írd a számításokat és képleteket.
 
 KORLÁTOK
 - Ha több lehetséges értelmezés van, jelezd a feltételezéseidet röviden.

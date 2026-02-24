@@ -66,8 +66,11 @@ export async function askPolicyRag({ query, k = TOP_K } = {}) {
     }
 
     // 1) Embed
-    const qvec = await embedQuery(query);
-    if (!Array.isArray(qvec) || qvec.length !== EMBEDDING_DIM) {
+    let qvec;
+    try {
+        qvec = await embedQuery(query);
+    } catch (e) { e.step = 'embed'; throw e; }
+    if (!Array.isArray(qvec) || qvec?.length !== EMBEDDING_DIM) {
         throw new Error(`Embedding dimension mismatch (got ${qvec?.length}, want ${EMBEDDING_DIM}); check model & SQL schema.`);
     }
 

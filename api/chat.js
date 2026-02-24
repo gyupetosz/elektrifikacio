@@ -13,7 +13,7 @@ function setCors(res) {
 
 function pickQuery(body) {
     if (!body) return '';
-    // OpenAI Chat formátum
+    // OpenAI Chat formï¿½tum
     if (Array.isArray(body.messages) && body.messages.length) {
         const last = body.messages[body.messages.length - 1];
         if (last && typeof last.content === 'string' && last.content.trim()) {
@@ -56,7 +56,7 @@ export default async function handler(req, res) {
         const result = await askPolicyRag({ query, k: 12 });
         let reply = result?.answer;
         if (typeof reply !== 'string' || !reply.trim()) {
-            reply = 'A megadott kontextus alapján nem tudok releváns választ adni.';
+            reply = 'A megadott kontextus alapjï¿½n nem tudok relevï¿½ns vï¿½laszt adni.';
         }
         return res.status(200).json({
             reply,
@@ -64,6 +64,10 @@ export default async function handler(req, res) {
         });
     } catch (e) {
         console.error('chat handler error:', e, e?.meta);
-        return res.status(500).json({ error: e.message || String(e) });
+        return res.status(500).json({
+            error: e.message || String(e),
+            type: e?.constructor?.name,
+            step: e?.step || undefined,
+        });
     }
 }

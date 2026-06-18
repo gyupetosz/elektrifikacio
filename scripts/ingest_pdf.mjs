@@ -20,7 +20,7 @@ if (!SUPABASE_URL) throw new Error('Missing SUPABASE_URL');
 if (!SERVICE_ROLE) throw new Error('Missing SUPABASE_SERVICE_ROLE_KEY');
 if (!OPENAI_API_KEY) throw new Error('Missing OPENAI_API_KEY');
 
-const supabase = createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSession: false } });
+const supabase = createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSession: false }, db: { schema: 'elektrifikacio' } });
 const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
 
 // CLI: node scripts/ingest_pdf.mjs <file-or-folder> [--overwrite]

@@ -202,6 +202,7 @@
     const safe    = DOMPurify.sanitize(mdHtml, { USE_PROFILES:{ html:true }});
     const pretty  = prettifyCitations(safe);
     container.innerHTML = `<span class="meta">Asszisztens • ${now()}</span>${pretty}`;
+    convo.push({ role: 'assistant', content: String(rawText ?? '') });
     if (window.renderMathInElement) {
       renderMathInElement(container, {
         delimiters: [
@@ -229,6 +230,10 @@
   }
 
   /* ===== rotating suggestion chips ===== */
+  // Conversation history sent to the API so follow-up questions resolve
+  // references ("és az mennyibe kerül?"). Trimmed to recent turns on send.
+  const convo = [];
+
   let suggestionOffset = 0;
   function renderSuggestions(){
     chips.innerHTML = '';
@@ -251,6 +256,7 @@ function cleanCitations(text) {
   async function doSend(){
     const text = input.value.trim(); if(!text) return;
     addUser(text); input.value=''; input.focus();
+    convo.push({ role:'user', content:text });
 
     const typing = addTyping(); send.disabled = true;
 
@@ -258,7 +264,7 @@ function cleanCitations(text) {
       const res = await fetch('/api/chat', {
         method:'POST',
         headers:{ 'Content-Type':'application/json' },
-        body: JSON.stringify({ messages:[{ role:'user', content:text }] })
+        body: JSON.stringify({ messages: convo.slice(-8) })
       });
 
       const ctype = (res.headers.get('content-type') || '').toLowerCase();

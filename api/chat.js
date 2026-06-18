@@ -28,6 +28,16 @@ function pickQuery(body) {
     return '';
 }
 
+// Prior turns (everything except the final user message) for follow-up rewriting.
+function pickHistory(body) {
+    if (!body || !Array.isArray(body.messages) || body.messages.length < 2) return [];
+    return body.messages
+        .slice(0, -1)
+        .filter(m => m && typeof m.content === 'string' && m.content.trim()
+            && (m.role === 'user' || m.role === 'assistant'))
+        .map(m => ({ role: m.role, content: m.content.trim() }));
+}
+
 function stripCitations(s = '') {
     return String(s).replace(/\s?\[\d+\]/g, '').replace(/[ ]{2,}/g, ' ').trim();
 }
@@ -53,7 +63,8 @@ export default async function handler(req, res) {
             return res.status(400).json({ error: 'Missing query' });
         }
 
-        const result = await askPolicyRag({ query, k: 12 });
+        const history = pickHistory(body);
+        const result = await askPolicyRag({ query, history });
         let reply = result?.answer;
         if (typeof reply !== 'string' || !reply.trim()) {
             reply = 'A megadott kontextus alapj�n nem tudok relev�ns v�laszt adni.';
